@@ -343,19 +343,36 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * that workerCount is 0 (which sometimes entails a recheck -- see
      * below).
      */
+    /**
+     * ctl两个作用
+     * 1、高三位代表线程状态
+     * 2、剩下代表线程数量
+     */
     private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
+    // Integer.SIZE = 32，COUNT_BITS = 29
     private static final int COUNT_BITS = Integer.SIZE - 3;
+    // 线程的最大数量
     private static final int CAPACITY   = (1 << COUNT_BITS) - 1;
 
     // runState is stored in the high-order bits
+    /**
+     * 线程池的5种状态
+     */
+    // 111
     private static final int RUNNING    = -1 << COUNT_BITS;
+    // 000
     private static final int SHUTDOWN   =  0 << COUNT_BITS;
+    // 001
     private static final int STOP       =  1 << COUNT_BITS;
+    // 010
     private static final int TIDYING    =  2 << COUNT_BITS;
+    // 011
     private static final int TERMINATED =  3 << COUNT_BITS;
 
     // Packing and unpacking ctl
+    // 计算出当前线程池的状态
     private static int runStateOf(int c)     { return c & ~CAPACITY; }
+    // 计算当前线程池中的工作线程个数
     private static int workerCountOf(int c)  { return c & CAPACITY; }
     private static int ctlOf(int rs, int wc) { return rs | wc; }
 
@@ -863,14 +880,26 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * state).
      * @return true if successful
      */
+    /**
+     * 添加工作线程
+     * @param firstTask
+     * @param core
+     * @return
+     */
     private boolean addWorker(Runnable firstTask, boolean core) {
+        // 对线程池工作状态的判断，和对工作数量线程的判断
         retry:
         for (;;) {
             int c = ctl.get();
             int rs = runStateOf(c);
 
             // Check if queue empty only if necessary.
-            if (rs >= SHUTDOWN && !(rs == SHUTDOWN && firstTask == null && !workQueue.isEmpty())) {
+            // 线程池状态不为 RUNNING
+            if (rs >= SHUTDOWN &&
+                    // 线程池状态为 SHUTDOWN，并且任务为空（execute中第二个addWorker）,工作队列不为空
+                    // 满足这三个条件，是为了处理核心线程为空，队列中仍然有任务的情况
+                    !(rs == SHUTDOWN && firstTask == null && !workQueue.isEmpty())) {
+                // 只要不是 RUNNING 状态，不处理新任务
                 return false;
             }
 
@@ -1304,8 +1333,10 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         // 若工作线程数小于核心线程数，则创建新的线程，并把当前任务 command 作为这个线程的第一个任务
         if (workerCountOf(c) < corePoolSize) {
             if (addWorker(command, true)) {
+                // 添加核心线程成功，直接返回
                 return;
             }
+            // 存在多个线程同时进入if条件的可能，只有一个会成功，其他的重新获取ctl值
             c = ctl.get();
         }
         /**
@@ -1323,8 +1354,10 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
                 // 任务添加到阻塞队列失败，执行拒绝策略
                 reject(command);
             }
-            // 如果线程池还是 RUNNING 的，并且线程数为 0，那么开启新的线程
+            // 如果线程池还是 RUNNING 的，并且工作线程数为 0，那么开启新的线程
             else if (workerCountOf(recheck) == 0) {
+                // 工作线程数为0，但是工作队列中有任务在排队
+                // 创建空任务非核心线程，处理队列中的任务
                 addWorker(null, false);
             }
         }
