@@ -905,13 +905,18 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
 
             for (;;) {
                 int wc = workerCountOf(c);
-                if (wc >= CAPACITY ||
-                    wc >= (core ? corePoolSize : maximumPoolSize))
+                // 判断当前工作线程是否达到最大值
+                if (wc >= CAPACITY || wc >= (core ? corePoolSize : maximumPoolSize))
                     return false;
+                // CAS 方式工作线程加一
                 if (compareAndIncrementWorkerCount(c))
+                    // 成功退出循环
                     break retry;
+                // 有并发，重新获取ctl
                 c = ctl.get();  // Re-read ctl
+                // 判断状态和之前是否一致
                 if (runStateOf(c) != rs)
+                    // 并发导致线程池状态发生变化，需要重新判断，再循环处理一遍
                     continue retry;
                 // else CAS failed due to workerCount change; retry inner loop
             }
